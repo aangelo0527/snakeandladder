@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snakes and Ladders Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+            background: #1a202c;
+            background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+        }
+        #game-board-container {
+            position: relative;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            aspect-ratio: 1 / 1;
+            position: relative;
+            background-image: url('https://i.imgur.com/g6d12aV.jpeg');
+            background-size: cover;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+        .square {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: rgba(255,255,255,0.7);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .overlay-images {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .overlay-images img {
+            position: absolute;
+            width: 15%; /* Default width */
+        }
+        /* Specific positions and sizes for snakes/ladders */
+        #img-s-17-7 { top: 7%; left: 63%; width: 25%; transform: rotate(10deg); }
+        #img-s-54-34 { top: 33%; left: 35%; width: 30%; transform: rotate(-25deg); }
+        #img-s-62-19 { top: 18%; left: 13%; width: 35%; transform: rotate(-5deg); }
+        #img-s-99-78 { top: 75%; left: 15%; width: 38%; transform: rotate(115deg); }
+        #img-l-4-14 { top: 4%; left: 32%; width: 18%; transform: rotate(5deg); }
+        #img-l-9-31 { top: 30%; left: 83%; width: 28%; transform: rotate(10deg); }
+        #img-l-28-84 { top: 25%; left: 75%; width: 55%; transform: rotate(-35deg); }
+        #img-l-71-91 { top: 70%; left: 5%; width: 25%; transform: rotate(5deg); }
+
+        .player {
+            position: absolute;
+            width: 5%;
+            height: 5%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem; /* Emoji size */
+            z-index: 10;
+            transition: all 0.3s ease-in-out;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+        }
+
+        .player[data-player-id="0"] { transform: translate(-50%, -50%); }
+        .player[data-player-id="1"] { transform: translate(0, -50%); }
+        .player[data-player-id="2"] { transform: translate(-50%, 0); }
+        .player[data-player-id="3"] { transform: translate(0, 0); }
+        
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7); display: flex; align-items: center;
+            justify-content: center; z-index: 50; transition: opacity 0.3s ease-in-out;
+        }
+        .modal-hidden { opacity: 0; pointer-events: none; }
+
+        /* 3D Dice */
+        .dice-container {
+            width: 100px; height: 100px;
+            perspective: 1000px;
+        }
+        #dice {
+            width: 100%; height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s;
+        }
+        .dice-face {
+            position: absolute;
+            width: 100px; height: 100px;
+            background: white;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            font-size: 60px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .face-1 { transform: rotateY(0deg) translateZ(50px); }
+        .face-2 { transform: rotateY(90deg) translateZ(50px); }
+        .face-3 { transform: rotateY(180deg) translateZ(50px); }
+        .face-4 { transform: rotateY(-90deg) translateZ(50px); }
+        .face-5 { transform: rotateX(90deg) translateZ(50px); }
+        .face-6 { transform: rotateX(-90deg) translateZ(50px); }
+
+    </style>
+</head>
+<body class="text-white flex items-center justify-center min-h-screen p-4">
+
+    <!-- Lobby Modal -->
+    <div id="lobby-modal" class="modal-backdrop">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold mb-6 text-center text-cyan-400">Snakes & Ladders Online</h2>
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label for="player-name" class="block text-sm font-medium mb-1">Your Name</label>
+                    <input type="text" id="player-name" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500 transition" value="Player">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Choose Avatar</label>
+                    <div id="lobby-avatar-picker" class="bg-gray-700 p-2 rounded-lg flex justify-around space-x-1"></div>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <button id="create-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg text-lg transition shadow-lg">Create New Game</button>
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="join-game-id" placeholder="Enter Game ID" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:border-cyan-500 transition">
+                    <button id="join-game-btn" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-semibold transition shadow-md">Join</button>
+                </div>
+            </div>
+            <p id="lobby-error" class="text-red-400 text-center mt-4 h-4"></p>
+            
+            <!-- Deployment Section -->
+            <div class="mt-8 border-t border-gray-700 pt-6">
+                <h3 class="text-xl font-bold text-center text-yellow-400 mb-4">Deploy Your Own Version</h3>
+                <p class="text-sm text-gray-400 text-center mb-4">
+                    To host this game on Vercel or another platform, you need a free Firebase project.
+                </p>
+                <div class="space-y-2">
+                    <label for="firebase-config-input" class="block text-sm font-medium">1. Paste your Firebase Config here:</label>
+                    <textarea id="firebase-config-input" rows="5" class="w-full bg-gray-900 text-xs font-mono rounded-lg p-2 border border-gray-600 focus:outline-none focus:border-cyan-500" placeholder="const firebaseConfig = { ... };"></textarea>
+                    <p class="text-xs text-gray-500">
+                        Get this from your Firebase project settings (click the web icon `</>`). You must also enable Firestore in "Test Mode".
+                    </p>
+                </div>
+                <button id="download-btn" class="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg text-lg transition shadow-lg">2. Download Ready-to-Upload File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Waiting Room Modal -->
+    <div id="waiting-room-modal" class="modal-backdrop modal-hidden">
+         <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4 text-cyan-400">Waiting for Players...</h2>
+            <p class="mb-4">Share this Game ID with your friends:</p>
+            <div class="bg-gray-900 rounded-lg p-3 mb-6 flex items-center justify-center">
+                <span id="game-id-display" class="text-2xl font-mono text-yellow-400"></span>
+                <button id="copy-game-id-btn" class="ml-4 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg" title="Copy ID">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 S0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </button>
+            </div>
+            <h3 class="font-semibold mb-2">Players Joined:</h3>
+            <div id="waiting-player-list" class="space-y-2 mb-6"></div>
+            <button id="start-game-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg text-lg transition shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Start Game</button>
+         </div>
+    </div>
+    
+    <!-- Win Modal -->
+    <div id="win-modal" class="modal-backdrop modal-hidden">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center" id="win-modal-content">
+            <h2 id="win-message" class="text-4xl font-bold mb-4 text-yellow-400"></h2>
+            <button id="new-game-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-8 rounded-lg text-xl transition shadow-lg">Back to Lobby</button>
+        </div>
+    </div>
+
+    <!-- Main Game UI -->
+    <div id="game-container" class="w-full max-w-7xl mx-auto hidden grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        <div id="game-board-container" class="lg:col-span-2 w-full">
+            <div class="overlay-images">
+                <!-- Snakes -->
+                <img id="img-s-17-7" src="https://i.imgur.com/8z2J5V1.png" alt="Snake">
+                <img id="img-s-54-34" src="https://i.imgur.com/wVf2b3u.png" alt="Snake">
+                <img id="img-s-62-19" src="https://i.imgur.com/JpUf1tH.png" alt="Snake">
+                <img id="img-s-99-78" src="https://i.imgur.com/5u9F6n3.png" alt="Snake">
+                <!-- Ladders -->
+                <img id="img-l-4-14" src="https://i.imgur.com/sI4v4sA.png" alt="Ladder">
+                <img id="img-l-9-31" src="https://i.imgur.com/kSxF5jT.png" alt="Ladder">
+                <img id="img-l-28-84" src="https://i.imgur.com/Bv6C3fA.png" alt="Ladder">
+                <img id="img-l-71-91" src="https://i.imgur.com/Q2xK1sO.png" alt="Ladder">
+            </div>
+            <div id="board" class="board"></div>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl space-y-6">
+            <h1 class="text-3xl font-bold text-center text-cyan-400">Game In Progress</h1>
+             <p class="text-center">Game ID: <span id="game-id-sidebar" class="font-mono text-yellow-400"></span></p>
+            <div id="player-info" class="space-y-3"></div>
+            <div id="game-log" class="h-24 bg-gray-900 rounded-lg p-3 text-sm overflow-y-auto border border-gray-700"></div>
+            <div class="flex flex-col items-center space-y-4">
+                 <div class="dice-container">
+                    <div id="dice">
+                        <div class="dice-face face-1">?</div>
+                        <div class="dice-face face-2">?</div>
+                        <div class="dice-face face-3">?</div>
+                        <div class="dice-face face-4">?</div>
+                        <div class="dice-face face-5">?</div>
+                        <div class="dice-face face-6">?</div>
+                    </div>
+                </div>
+                <button id="roll-dice-btn" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg text-xl transition shadow-lg disabled:bg-gray-600 disabled:cursor-not-allowed">Roll Dice</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, updateDoc, onSnapshot, collection, addDoc, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- FIREBASE SETUP (STANDALONE) ---
+        // PASTE YOUR FIREBASE CONFIGURATION OBJECT HERE
+        const firebaseConfig = {
+          apiKey: "PASTE_YOUR_API_KEY",
+          authDomain: "PASTE_YOUR_AUTH_DOMAIN",
+          projectId: "PASTE_YOUR_PROJECT_ID",
+          storageBucket: "PASTE_YOUR_STORAGE_BUCKET",
+          messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
+          appId: "PASTE_YOUR_APP_ID"
+        };
+        // --- END OF CONFIGURATION ---
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId;
+        let gameId;
+        let gameUnsubscribe;
+        let localPlayerState = { name: 'Player', avatar: '??' };
+        
+        const lobbyModal = document.getElementById('lobby-modal');
+        const waitingRoomModal = document.getElementById('waiting-room-modal');
+        const winModal = document.getElementById('win-modal');
+        const gameContainer = document.getElementById('game-container');
+        const playerNameInput = document.getElementById('player-name');
+        const lobbyAvatarPicker = document.getElementById('lobby-avatar-picker');
+        const createGameBtn = document.getElementById('create-game-btn');
+        const joinGameIdInput = document.getElementById('join-game-id');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const lobbyError = document.getElementById('lobby-error');
+        const gameIdDisplay = document.getElementById('game-id-display');
+        const copyGameIdBtn = document.getElementById('copy-game-id-btn');
+        const waitingPlayerList = document.getElementById('waiting-player-list');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const board = document.getElementById('board');
+        const rollDiceBtn = document.getElementById('roll-dice-btn');
+        const diceEl = document.getElementById('dice');
+        const playerInfoEl = document.getElementById('player-info');
+        const gameLogEl = document.getElementById('game-log');
+        const winMessageEl = document.getElementById('win-message');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const gameIdSidebar = document.getElementById('game-id-sidebar');
+        const downloadBtn = document.getElementById('download-btn');
+        const firebaseConfigInput = document.getElementById('firebase-config-input');
+
+        const avatars = ['??', '??', '??', '??', '??', '??'];
+        const playerColors = ['#f87171', '#60a5fa', '#4ade80', '#facc15'];
+        const snakesAndLadders = { 17: 7, 54: 34, 62: 19, 99: 78, 4: 14, 9: 31, 28: 84, 71: 91 };
+        let synths = {};
+        let isAnimating = false;
+
+        async function authenticateUser() {
+             if (auth.currentUser) { userId = auth.currentUser.uid; return; }
+            try {
+                const userCredential = await signInAnonymously(auth);
+                userId = userCredential.user.uid;
+            } catch (error) { 
+                console.error("Authentication failed:", error); 
+                lobbyError.textContent = "Could not connect to Firebase. Check config and Firestore rules."; 
+            }
+        }
+
+        function setupLobby() {
+            lobbyAvatarPicker.innerHTML = '';
+            avatars.forEach(avatar => {
+                const btn = document.createElement('button');
+                btn.textContent = avatar;
+                btn.className = `p-2 rounded-lg transition ${localPlayerState.avatar === avatar ? 'bg-cyan-500 scale-110' : 'bg-gray-600'}`;
+                btn.onclick = () => { localPlayerState.avatar = avatar; setupLobby(); };
+                lobbyAvatarPicker.appendChild(btn);
+            });
+            playerNameInput.onchange = (e) => localPlayerState.name = e.target.value;
+        }
+        
+        createGameBtn.addEventListener('click', async () => {
+            if (!userId) { lobbyError.textContent = "Authenticating..."; await authenticateUser(); if(!userId) return; }
+            lobbyError.textContent = "";
+            const newPlayer = { ...localPlayerState, userId, id: 0, position: 0, color: playerColors[0] };
+            try {
+                const gameCollection = collection(db, 'games');
+                const gameDocRef = await addDoc(gameCollection, {
+                    players: [newPlayer], currentPlayerIndex: 0, status: 'waiting',
+                    gameLog: [`Game created by ${newPlayer.name}.`], createdAt: serverTimestamp(),
+                    diceRoll: 1, winner: null
+                });
+                gameId = gameDocRef.id; await listenToGameUpdates();
+            } catch (error) { console.error("Error creating game:", error); lobbyError.textContent = "Failed to create game. Is Firestore enabled?"; }
+        });
+        
+        joinGameBtn.addEventListener('click', async () => {
+            const joinId = joinGameIdInput.value.trim();
+            if (!joinId) { lobbyError.textContent = "Please enter a Game ID."; return; }
+            if (!userId) { lobbyError.textContent = "Authenticating..."; await authenticateUser(); if(!userId) return; }
+            lobbyError.textContent = "";
+            try {
+                const gameDocRef = doc(db, 'games', joinId);
+                const gameDoc = await getDoc(gameDocRef);
+                if (!gameDoc.exists()) { lobbyError.textContent = "Game not found."; return; }
+                const gameData = gameDoc.data();
+                if (gameData.status !== 'waiting') { lobbyError.textContent = "Game has already started."; return; }
+                if (gameData.players.length >= 4) { lobbyError.textContent = "Game is full."; return; }
+                if(gameData.players.some(p => p.userId === userId)) { gameId = joinId; await listenToGameUpdates(); return; }
+                const newPlayer = { ...localPlayerState, userId, id: gameData.players.length, position: 0, color: playerColors[gameData.players.length] };
+                await updateDoc(gameDocRef, { players: arrayUnion(newPlayer), gameLog: arrayUnion(`${newPlayer.name} has joined the game.`) });
+                gameId = joinId; await listenToGameUpdates();
+            } catch (error) { console.error("Error joining game:", error); lobbyError.textContent = "Failed to join game."; }
+        });
+
+        copyGameIdBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(gameId).then(() => {
+                copyGameIdBtn.innerHTML = `<svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                setTimeout(() => { copyGameIdBtn.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`; }, 2000);
+            });
+        });
+        
+        startGameBtn.addEventListener('click', async () => {
+            const gameDocRef = doc(db, 'games', gameId);
+            await updateDoc(gameDocRef, { status: 'in-progress', gameLog: arrayUnion('Game has started!') });
+        });
+
+        function setupSounds() {
+            synths.dice = new Tone.MembraneSynth().toDestination();
+            synths.hop = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            synths.ladder = new Tone.Synth().toDestination();
+            synths.snake = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0, release: 0.1 } }).toDestination();
+        }
+
+        async function listenToGameUpdates() {
+            if (gameUnsubscribe) gameUnsubscribe();
+            const gameDocRef = doc(db, 'games', gameId);
+            gameUnsubscribe = onSnapshot(gameDocRef, (doc) => {
+                if (doc.exists()) { updateUIWithGameState(doc.data()); }
+                else { console.error("Game document disappeared."); }
+            });
+        }
+        
+        function updateUIWithGameState(gameState) {
+            const { status, players, currentPlayerIndex, winner, gameLog, diceRoll } = gameState;
+            if (status === 'waiting') {
+                waitingRoomModal.classList.remove('modal-hidden');
+                gameContainer.classList.add('hidden');
+                gameContainer.classList.remove('grid');
+                winModal.classList.add('modal-hidden');
+                lobbyModal.classList.add('modal-hidden');
+                gameIdDisplay.textContent = gameId;
+                waitingPlayerList.innerHTML = '';
+                players.forEach(p => {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'flex items-center justify-center space-x-2 text-lg';
+                    playerDiv.innerHTML = `<span>${p.avatar}</span> <span>${p.name}</span>`;
+                    waitingPlayerList.appendChild(playerDiv);
+                });
+                const isHost = players[0]?.userId === userId;
+                startGameBtn.style.display = isHost ? 'block' : 'none';
+                startGameBtn.disabled = players.length < 2;
+            } else if (status === 'in-progress') {
+                waitingRoomModal.classList.add('modal-hidden'); winModal.classList.add('modal-hidden');
+                if (gameContainer.classList.contains('hidden')) { createBoard(); }
+                gameContainer.classList.remove('hidden'); gameContainer.classList.add('grid');
+                gameIdSidebar.textContent = gameId;
+                updatePlayerInfo(players, currentPlayerIndex);
+                if (!isAnimating) updatePlayerPositions(players);
+                gameLogEl.innerHTML = '';
+                gameLog.slice(-5).forEach(msg => { const p = document.createElement('p'); p.textContent = msg; gameLogEl.appendChild(p); });
+                gameLogEl.scrollTop = gameLogEl.scrollHeight;
+                const isMyTurn = players[currentPlayerIndex]?.userId === userId;
+                rollDiceBtn.disabled = !isMyTurn || isAnimating;
+            } else if (status === 'finished') {
+                winModal.classList.remove('modal-hidden');
+                winMessageEl.textContent = `${winner} Wins!`;
+            }
+        }
+        
+        function createBoard() {
+            if(board.children.length > 0) return;
+            for (let i = 100; i > 0; i--) {
+                const square = document.createElement('div');
+                const row = Math.floor((i - 1) / 10);
+                let displayNum = (row % 2 !== 0) ? (10 * (9-row) + 10 - ((i-1)%10)) : (10 * (9-row) + ((i-1)%10) + 1);
+                square.dataset.square = displayNum;
+                square.classList.add('square', `square-${displayNum}`);
+                const numberEl = document.createElement('span');
+                numberEl.textContent = displayNum;
+                square.appendChild(numberEl);
+                board.appendChild(square);
+            }
+        }
+        
+        function getSquareCenter(squareNum) {
+            if (squareNum === 0) return { x: 5, y: 105 }; // Start position off-board
+            const squareEl = board.querySelector(`.square-${squareNum}`);
+            if (!squareEl) return { x: 0, y: 0 };
+            const rect = squareEl.getBoundingClientRect();
+            const boardRect = board.getBoundingClientRect();
+            return {
+                x: (rect.left - boardRect.left + rect.width / 2) / boardRect.width * 100,
+                y: (rect.top - boardRect.top + rect.height / 2) / boardRect.height * 100,
+            };
+        }
+
+        function updatePlayerInfo(players, currentPlayerIndex) {
+            playerInfoEl.innerHTML = '';
+            players.forEach((player, index) => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = `p-3 rounded-lg flex items-center justify-between transition-all duration-300 ${index === currentPlayerIndex ? 'bg-cyan-800 ring-2 ring-cyan-400' : 'bg-gray-700'}`;
+                playerDiv.innerHTML = `<div class="flex items-center space-x-3"><span class="text-2xl">${player.avatar}</span><span class="font-semibold">${player.name}</span></div><span class="font-bold text-lg px-3 py-1 rounded" style="background-color:${player.color}; color: #1a202c;">${player.position === 0 ? 'Start' : player.position}</span>`;
+                playerInfoEl.appendChild(playerDiv);
+            });
+        }
+
+        function updatePlayerPositions(players) {
+            document.querySelectorAll('.player').forEach(p => p.remove());
+            players.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player';
+                playerEl.textContent = player.avatar;
+                playerEl.style.backgroundColor = player.color;
+                playerEl.dataset.playerId = player.id;
+                board.appendChild(playerEl);
+                const coords = getSquareCenter(player.position);
+                playerEl.style.left = `${coords.x}%`;
+                playerEl.style.top = `${coords.y}%`;
+            });
+        }
+        
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+        async function animatePlayerMove(player, startPos, endPos) {
+            const playerEl = document.querySelector(`.player[data-player-id="${player.id}"]`);
+            for (let i = startPos + 1; i <= endPos; i++) {
+                const coords = getSquareCenter(i);
+                playerEl.style.left = `${coords.x}%`;
+                playerEl.style.top = `${coords.y}%`;
+                synths.hop.triggerAttackRelease('C4', '8n', Tone.now());
+                await sleep(300);
+            }
+        }
+
+        async function animateSnakeOrLadder(player, endPos) {
+            const playerEl = document.querySelector(`.player[data-player-id="${player.id}"]`);
+            const coords = getSquareCenter(endPos);
+            const isLadder = endPos > player.position;
+            if (isLadder) {
+                synths.ladder.triggerAttackRelease('C4', '0.5', Tone.now());
+                synths.ladder.triggerAttackRelease('E4', '0.5', Tone.now() + 0.2);
+                synths.ladder.triggerAttackRelease('G4', '0.5', Tone.now() + 0.4);
+            } else {
+                synths.snake.triggerAttackRelease('4n');
+            }
+            playerEl.style.transition = 'all 1s ease-in-out';
+            playerEl.style.left = `${coords.x}%`;
+            playerEl.style.top = `${coords.y}%`;
+            await sleep(1000);
+            playerEl.style.transition = 'all 0.3s ease-in-out';
+        }
+        
+        function rollTheDice(roll) {
+            const rotations = { 1: 'rotateY(0deg)', 2: 'rotateY(-90deg)', 3: 'rotateY(-180deg)', 4: 'rotateY(90deg)', 5: 'rotateX(-90deg)', 6: 'rotateX(90deg)' };
+            const randomSpins = `rotateX(${Math.random()*2+2}turn) rotateY(${Math.random()*2+2}turn)`;
+            diceEl.style.transform = `${randomSpins} ${rotations[roll]}`;
+            synths.dice.triggerAttackRelease('C2', '8n');
+        }
+
+        rollDiceBtn.addEventListener('click', async () => {
+            isAnimating = true;
+            rollDiceBtn.disabled = true;
+            await Tone.start();
+            
+            const roll = Math.floor(Math.random() * 6) + 1;
+            rollTheDice(roll);
+            
+            const gameDocRef = doc(db, 'games', gameId);
+            const gameDoc = await getDoc(gameDocRef);
+            const gameState = gameDoc.data();
+            const player = gameState.players[gameState.currentPlayerIndex];
+            
+            await sleep(1500);
+            
+            let updatedLog = [...gameState.gameLog, `${player.name} rolled a ${roll}.`];
+            const startPosition = player.position;
+            const newPosition = startPosition + roll;
+            
+            let finalPosition = player.position;
+            let nextPlayerIndex = gameState.currentPlayerIndex;
+            let status = gameState.status;
+            let winner = null;
+
+            if (newPosition > 100) {
+                updatedLog.push(`${player.name} needs to land exactly on 100.`);
+                nextPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+            } else {
+                await animatePlayerMove(player, startPosition, newPosition);
+                finalPosition = newPosition;
+                if (snakesAndLadders[finalPosition]) {
+                    const destination = snakesAndLadders[finalPosition];
+                    const type = destination > finalPosition ? 'ladder' : 'snake';
+                    updatedLog.push(`${player.name} found a ${type}!`);
+                    await animateSnakeOrLadder(player, destination);
+                    finalPosition = destination;
+                }
+                if (finalPosition === 100) {
+                    status = 'finished'; winner = player.name;
+                    updatedLog.push(`${player.name} has won the game!`);
+                } else {
+                    nextPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+                }
+            }
+
+            const updatedPlayers = [...gameState.players];
+            updatedPlayers[gameState.currentPlayerIndex].position = finalPosition;
+            
+            await updateDoc(gameDocRef, {
+                players: updatedPlayers, currentPlayerIndex: nextPlayerIndex,
+                gameLog: updatedLog, diceRoll: roll, status, winner
+            });
+            
+            isAnimating = false;
+        });
+
+        newGameBtn.addEventListener('click', () => {
+            if (gameUnsubscribe) gameUnsubscribe();
+            gameId = null;
+            winModal.classList.add('modal-hidden');
+            gameContainer.classList.add('hidden');
+            gameContainer.classList.remove('grid');
+            lobbyModal.classList.remove('modal-hidden');
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const userConfig = firebaseConfigInput.value.trim();
+            if (!userConfig) {
+                 alert('Please paste your Firebase config object into the text area first.');
+                 return;
+            }
+
+            let configObjectString = userConfig;
+            if (configObjectString.startsWith('const firebaseConfig = ')) {
+                configObjectString = configObjectString.substring('const firebaseConfig = '.length).replace(/;$/, '');
+            }
+
+            const pageHTML = document.documentElement.outerHTML;
+            const configPlaceholderRegex = /const firebaseConfig = {[^}]+};/s;
+            const newConfigString = `const firebaseConfig = ${configObjectString};`;
+            const finalHTML = pageHTML.replace(configPlaceholderRegex, newConfigString);
+            
+            const blob = new Blob([finalHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'snakes-and-ladders-online.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        (async () => {
+            await authenticateUser();
+            setupLobby();
+            setupSounds();
+        })();
+
+    </script>
+</body>
+</html>
+
